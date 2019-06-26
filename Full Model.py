@@ -22,7 +22,8 @@ import gc
 
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
-from keras.layers import Dense, Input, CuDNNLSTM, Embedding, Dropout, Activation, CuDNNGRU, Conv1D
+from keras.utils import to_categorical
+from keras.layers import Dense, Input, LSTM, Embedding, Dropout, Activation, GRU, Conv1D
 from keras.layers import Bidirectional, GlobalMaxPool1D, GlobalMaxPooling1D, GlobalAveragePooling1D
 from keras.layers import Input, Embedding, Dense, Conv2D, MaxPool2D, concatenate
 from keras.layers import Reshape, Flatten, Concatenate, Dropout, SpatialDropout1D
@@ -360,8 +361,8 @@ def build_model(embedding_matrix, nb_words, embedding_size=300):
     inp = Input(shape=(max_length,))
     x = Embedding(nb_words, embedding_size, weights=[embedding_matrix], trainable=False)(inp)
     x = SpatialDropout1D(0.3)(x)
-    x1 = Bidirectional(CuDNNLSTM(256, return_sequences=True))(x)
-    x2 = Bidirectional(CuDNNGRU(128, return_sequences=True))(x1)
+    x1 = Bidirectional(LSTM(256, return_sequences=True))(x)
+    x2 = Bidirectional(GRU(128, return_sequences=True))(x1)
     max_pool1 = GlobalMaxPooling1D()(x1)
     max_pool2 = GlobalMaxPooling1D()(x2)
     conc = Concatenate()([max_pool1, max_pool2])
@@ -427,21 +428,21 @@ text_list = train_text
 y1 = train['Label'].values
 num_train_data = y1.shape[0]
 
-y = pd.get_dummies(train['Label']).values
-print('Shape of label tensor:', y.shape)
-print("--- %s seconds ---" % (time.time() - start_time))
+#y = pd.get_dummies(train['Label']).values
+#print('Shape of label tensor:', y.shape)
+#print("--- %s seconds ---" % (time.time() - start_time))
 
 
 # In[18]:
 
 
-print(y)
+#print(y)
 
 
 # In[19]:
 
 
-y.shape
+#y.shape
 
 
 # In[20]:
@@ -457,6 +458,8 @@ type(train['Label'][0])
 
 
 # In[ ]:
+
+y = to_categorical(y1, num_classes=6)
 
 
 start_time = time.time()
@@ -532,8 +535,12 @@ start_time = time.time()
 print("Start training ...")
 model = build_model(embedding_matrix, nb_words, embedding_size)
 model.fit(train_word_sequences, y, batch_size=batch_size, epochs=num_epoch-1, verbose=2)
-pred_prob += 0.15*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
+model.save("model_one.h5")
+print("Saved model to disk")
+#pred_prob += 0.15*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 model.fit(train_word_sequences, y, batch_size=batch_size, epochs=1, verbose=2)
+model.save("model_two.h5")
+print("Saved model to disk")
 #pred_prob += 0.35*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 del model, embedding_matrix_fasttext, embedding_matrix
 gc.collect()
@@ -554,8 +561,12 @@ start_time = time.time()
 print("Start training ...")
 model = build_model(embedding_matrix, nb_words, embedding_size)
 model.fit(train_word_sequences, y, batch_size=batch_size, epochs=num_epoch-1, verbose=2)
+model.save("model_three.h5")
+print("Saved model to disk")
 #pred_prob += 0.15*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 model.fit(train_word_sequences, y, batch_size=batch_size, epochs=1, verbose=2)
+model.save("model_four.h5")
+print("Saved model to disk")
 #pred_prob += 0.35*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 print("--- %s seconds ---" % (time.time() - start_time))
 
@@ -566,4 +577,5 @@ print("--- %s seconds ---" % (time.time() - start_time))
 '''submission = pd.DataFrame.from_dict({'qid': test['qid']})
 submission['prediction'] = (pred_prob>0.35).astype(int)
 submission.to_csv('submission.csv', index=False)'''
+
 
