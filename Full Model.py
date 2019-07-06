@@ -6,7 +6,12 @@
 
 from __future__ import absolute_import, division
 
+#import os
 import os
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID";
+ 
+os.environ["CUDA_VISIBLE_DEVICES"]="1"; 
+
 import time
 import numpy as np
 import pandas as pd
@@ -22,7 +27,8 @@ import gc
 
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
-from keras.layers import Dense, Input, CuDNNLSTM, Embedding, Dropout, Activation, CuDNNGRU, Conv1D
+from keras.utils import to_categorical
+from keras.layers import Dense, Input, LSTM, Embedding, Dropout, Activation, GRU, Conv1D
 from keras.layers import Bidirectional, GlobalMaxPool1D, GlobalMaxPooling1D, GlobalAveragePooling1D
 from keras.layers import Input, Embedding, Dense, Conv2D, MaxPool2D, concatenate
 from keras.layers import Reshape, Flatten, Concatenate, Dropout, SpatialDropout1D
@@ -111,8 +117,6 @@ class AttentionWeightedAverage(Layer):
 # In[4]:
 
 
-#Load pre-trained embeddings for English words
-
 spell_model = gensim.models.KeyedVectors.load_word2vec_format('wiki-news-300d-1M/wiki-news-300d-1M.vec')
 words = spell_model.index2word
 w_rank = {}
@@ -138,7 +142,6 @@ def P(word):
 
 def correction(word): 
     "Most probable spelling correction for word."
-    "correction('quikly') returns quickly    correction('israil') returns israel"
     return max(candidates(word), key=P)
 
 def candidates(word): 
@@ -179,39 +182,27 @@ def load_glove(word_dict, lemma_dict):
     embedding_matrix = np.zeros((nb_words, embed_size), dtype=np.float32)
     unknown_vector = np.zeros((embed_size,), dtype=np.float32) - 1.
     print(unknown_vector[:5])
-    
-    
     for key in tqdm(word_dict):
-        
-        #Check for original word
         word = key
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for lowercase version of word
         word = key.lower()
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for uppercase version of word
         word = key.upper()
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for Capitalized word
         word = key.capitalize()
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for stemmed version of word
         word = ps.stem(key)
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
@@ -227,16 +218,11 @@ def load_glove(word_dict, lemma_dict):
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for lemmatized(base) version of word
-        #For "buying", check "buy"
         word = lemma_dict[key]
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for corrected version of word
         if len(key) > 1:
             word = correction(key)
             embedding_vector = embeddings_index.get(word)
@@ -260,36 +246,26 @@ def load_fasttext(word_dict, lemma_dict):
     unknown_vector = np.zeros((embed_size,), dtype=np.float32) - 1.
     print(unknown_vector[:5])
     for key in tqdm(word_dict):
-        
-        #Check for original word
         word = key
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for lowercase version of word
         word = key.lower()
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for uppercase version of word
         word = key.upper()
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for Capitalized word
         word = key.capitalize()
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for stemmed version of word
         word = ps.stem(key)
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
@@ -305,16 +281,11 @@ def load_fasttext(word_dict, lemma_dict):
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for lemmatized(base) version of word
-        #For "buying", check "buy"
         word = lemma_dict[key]
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for corrected version of word
         if len(key) > 1:
             word = correction(key)
             embedding_vector = embeddings_index.get(word)
@@ -338,36 +309,26 @@ def load_para(word_dict, lemma_dict):
     unknown_vector = np.zeros((embed_size,), dtype=np.float32) - 1.
     print(unknown_vector[:5])
     for key in tqdm(word_dict):
-        
-        #Check for original word
         word = key
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for lowercase version of word
         word = key.lower()
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for uppercase version of word
         word = key.upper()
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for Capitalized word
         word = key.capitalize()
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for stemmed version of word
         word = ps.stem(key)
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
@@ -383,16 +344,11 @@ def load_para(word_dict, lemma_dict):
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for lemmatized(base) version of word
-        #For "buying", check "buy"
         word = lemma_dict[key]
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             embedding_matrix[word_dict[key]] = embedding_vector
             continue
-            
-        #Check for corrected version of word
         if len(key) > 1:
             word = correction(key)
             embedding_vector = embeddings_index.get(word)
@@ -406,14 +362,12 @@ def load_para(word_dict, lemma_dict):
 # In[9]:
 
 
-#Build the model
-
 def build_model(embedding_matrix, nb_words, embedding_size=300):
     inp = Input(shape=(max_length,))
     x = Embedding(nb_words, embedding_size, weights=[embedding_matrix], trainable=False)(inp)
     x = SpatialDropout1D(0.3)(x)
-    x1 = Bidirectional(CuDNNLSTM(256, return_sequences=True))(x)
-    x2 = Bidirectional(CuDNNGRU(128, return_sequences=True))(x1)
+    x1 = Bidirectional(LSTM(256, return_sequences=True))(x)
+    x2 = Bidirectional(GRU(128, return_sequences=True))(x1)
     max_pool1 = GlobalMaxPooling1D()(x1)
     max_pool2 = GlobalMaxPooling1D()(x2)
     conc = Concatenate()([max_pool1, max_pool2])
@@ -479,22 +433,21 @@ text_list = train_text
 y1 = train['Label'].values
 num_train_data = y1.shape[0]
 
-#Categorization of labels(One-hot encoding)
-y = pd.get_dummies(train['Label']).values
-print('Shape of label tensor:', y.shape)
-print("--- %s seconds ---" % (time.time() - start_time))
+#y = pd.get_dummies(train['Label']).values
+#print('Shape of label tensor:', y.shape)
+#print("--- %s seconds ---" % (time.time() - start_time))
 
 
 # In[18]:
 
 
-print(y)
+#print(y)
 
 
 # In[19]:
 
 
-y.shape
+#y.shape
 
 
 # In[20]:
@@ -511,11 +464,11 @@ type(train['Label'][0])
 
 # In[ ]:
 
+y = to_categorical(y1, num_classes=6)
+
 
 start_time = time.time()
 print("Spacy NLP ...")
-
-#Load spacy English and create a pipeline with training text
 nlp = spacy.load('en_core_web_lg', disable=['parser','ner','tagger'])
 nlp.vocab.add_flag(lambda s: s.lower() in spacy.lang.en.stop_words.STOP_WORDS, spacy.attrs.IS_STOP)
 word_dict = {}
@@ -529,11 +482,9 @@ docs = nlp.pipe(text_list, n_threads = 2)
 
 word_sequences = []
 
-#Create the integer-encoded word dictionary and lemma dictionary from document corpus
 for doc in tqdm(docs):
     word_seq = []
     for token in doc:
-        #Append indexes and lemmas of words(exclude punctuations)
         if (token.text not in word_dict) and (token.pos_ is not "PUNCT"):
             word_dict[token.text] = word_index
             word_index += 1
@@ -556,7 +507,7 @@ max_length = 55
 embedding_size = 600
 learning_rate = 0.001
 batch_size = 512
-num_epoch = 4
+num_epoch = 20
 
 
 # In[ ]:
@@ -578,8 +529,6 @@ train_word_sequences.shape
 # In[ ]:
 
 
-#Glove + FastText model
-
 start_time = time.time()
 print("Loading embedding matrix ...")
 embedding_matrix_glove, nb_words = load_glove(word_dict, lemma_dict)
@@ -591,8 +540,12 @@ start_time = time.time()
 print("Start training ...")
 model = build_model(embedding_matrix, nb_words, embedding_size)
 model.fit(train_word_sequences, y, batch_size=batch_size, epochs=num_epoch-1, verbose=2)
-pred_prob += 0.15*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
+model.save("model_one.h5")
+print("Saved model to disk")
+#pred_prob += 0.15*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 model.fit(train_word_sequences, y, batch_size=batch_size, epochs=1, verbose=2)
+model.save("model_two.h5")
+print("Saved model to disk")
 #pred_prob += 0.35*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 del model, embedding_matrix_fasttext, embedding_matrix
 gc.collect()
@@ -602,8 +555,6 @@ print("--- %s seconds ---" % (time.time() - start_time))
 
 # In[ ]:
 
-
-#Para model
 
 start_time = time.time()
 print("Loading embedding matrix ...")
@@ -615,8 +566,12 @@ start_time = time.time()
 print("Start training ...")
 model = build_model(embedding_matrix, nb_words, embedding_size)
 model.fit(train_word_sequences, y, batch_size=batch_size, epochs=num_epoch-1, verbose=2)
+model.save("model_three.h5")
+print("Saved model to disk")
 #pred_prob += 0.15*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 model.fit(train_word_sequences, y, batch_size=batch_size, epochs=1, verbose=2)
+model.save("model_four.h5")
+print("Saved model to disk")
 #pred_prob += 0.35*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 print("--- %s seconds ---" % (time.time() - start_time))
 
