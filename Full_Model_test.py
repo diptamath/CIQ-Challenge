@@ -12,6 +12,7 @@ os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID";
  
 os.environ["CUDA_VISIBLE_DEVICES"]="0"; 
 
+import pickle
 import time
 import numpy as np
 import pandas as pd
@@ -37,6 +38,7 @@ from keras.models import Model
 from keras import backend as K
 from keras.engine.topology import Layer
 from keras import initializers, regularizers, constraints, optimizers, layers
+from keras.models import load_model
 
 import sys
 from os.path import dirname
@@ -374,7 +376,7 @@ def build_model(embedding_matrix, nb_words, embedding_size=300):
     predictions = Dense(6, activation='softmax')(conc)
     model = Model(inputs=inp, outputs=predictions)
     adam = optimizers.Adam(lr=learning_rate)
-    model.compile(optimizer=adam, loss='binary_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['accuracy'])
     return model
 
 
@@ -389,7 +391,7 @@ test = pd.read_csv('ids_and_questions_TestSet.csv')
 
 
 train['Label'] = train['Label'].astype(str)
-test['Label'] = test['Label'].astype(str)
+
 
 
 # In[12]:
@@ -437,21 +439,9 @@ text_list = pd.concat([train_text, test_text])
 y1 = train['Label'].values
 num_train_data = y1.shape[0]
 
-#y = pd.get_dummies(train['Label']).values
-#print('Shape of label tensor:', y.shape)
-#print("--- %s seconds ---" % (time.time() - start_time))
+print('Shape of label tensor:', y1.shape)
+print("--- %s seconds ---" % (time.time() - start_time))
 
-
-# In[18]:
-
-
-#print(y)
-
-
-# In[19]:
-
-
-#y.shape
 
 
 # In[20]:
@@ -512,7 +502,7 @@ max_length = 55
 embedding_size = 600
 learning_rate = 0.001
 batch_size = 512
-num_epoch = 20
+num_epoch = 4
 
 
 # In[ ]:
@@ -522,7 +512,12 @@ train_word_sequences = pad_sequences(train_word_sequences, maxlen=max_length, pa
 test_word_sequences = pad_sequences(test_word_sequences, maxlen=max_length, padding='post')
 print(train_word_sequences[:1])
 print(test_word_sequences[:1])
-pred_prob = np.zeros((len(test_word_sequences),), dtype=np.float32)
+
+with open("test_word_sequences.pkl", "wb") as b:
+    pickle.dump(test_word_sequences, b)
+
+class_no=6
+pred_prob = np.zeros((len(test_word_sequences),class_no), dtype=np.float32)
 
 
 # In[54]:
@@ -545,13 +540,13 @@ print("--- %s seconds ---" % (time.time() - start_time))
 start_time = time.time()
 print("Start training ...")
 model = build_model(embedding_matrix, nb_words, embedding_size)
-model.fit(train_word_sequences, y, batch_size=batch_size, epochs=num_epoch-1, verbose=2)
-model.save("model_one.h5")
-print("Saved model to disk")
+# model.fit(train_word_sequences, y, batch_size=batch_size, epochs=num_epoch-1, verbose=2)
+model.load_model("model_one.h5")
+# print("Saved model to disk")
 pred_prob += 0.15*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
-model.fit(train_word_sequences, y, batch_size=batch_size, epochs=1, verbose=2)
-model.save("model_two.h5")
-print("Saved model to disk")
+# model.fit(train_word_sequences, y, batch_size=batch_size, epochs=1, verbose=2)
+model.load_model("model_two.h5")
+#print("Saved model to disk")
 pred_prob += 0.35*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 del model, embedding_matrix_fasttext, embedding_matrix
 gc.collect()
@@ -571,21 +566,22 @@ print("--- %s seconds ---" % (time.time() - start_time))
 start_time = time.time()
 print("Start training ...")
 model = build_model(embedding_matrix, nb_words, embedding_size)
-model.fit(train_word_sequences, y, batch_size=batch_size, epochs=num_epoch-1, verbose=2)
-model.save("model_three.h5")
-print("Saved model to disk")
+#model.fit(train_word_sequences, y, batch_size=batch_size, epochs=num_epoch-1, verbose=2)
+model.load_model("model_three.h5")
+#print("Saved model to disk")
 pred_prob += 0.15*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
-model.fit(train_word_sequences, y, batch_size=batch_size, epochs=1, verbose=2)
-model.save("model_four.h5")
-print("Saved model to disk")
+#model.fit(train_word_sequences, y, batch_size=batch_size, epochs=1, verbose=2)
+model.load_model("model_four.h5")
+#print("Saved model to disk")
 pred_prob += 0.35*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 print("--- %s seconds ---" % (time.time() - start_time))
 
+np.save('prediction_probability',pred_prob)
 
 # In[ ]:
 
 
-submission = pd.DataFrame.from_dict({'qid': test['qid']})
-submission['prediction'] = (pred_prob>0.35).astype(int)
-submission.to_csv('submission.csv', index=False)
+# submission = pd.DataFrame.from_dict({'qid': test['qid']})
+# submission['prediction'] = (pred_prob>0.35).astype(int)
+# submission.to_csv('submission.csv', index=False)
 
