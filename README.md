@@ -10,6 +10,8 @@ Hypothetical Questions
 Other
 Sincere Question
 
+The final code/model used is Full Model.py
+
 The link to the model is:
 https://github.com/diptamath/CIQ-Challenge/blob/master/CIQ_Diagram.jpg
 
