@@ -10,7 +10,8 @@ Hypothetical Questions
 Other
 Sincere Question
 
-![alt text] https://github.com/diptamath/CIQ-Challenge/blob/master/CIQ_Diagram.jpg
+The link to the model is:
+https://github.com/diptamath/CIQ-Challenge/blob/master/CIQ_Diagram.jpg
 
 Our approach was awarded the First Prize for this competition with an overall F1 score of 67.32%
 
