@@ -1,12 +1,6 @@
-
-# coding: utf-8
-
-# In[1]:
-
-
 from __future__ import absolute_import, division
 
-#import os
+import re
 import os
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID";
  
@@ -44,78 +38,7 @@ from os.path import dirname
 from keras import initializers
 from keras.engine import InputSpec, Layer
 from keras import backend as K
-
-
-# In[2]:
-
-
 import spacy
-
-
-# In[3]:
-
-
-class AttentionWeightedAverage(Layer):
-    """
-    Computes a weighted average of the different channels across timesteps.
-    Uses 1 parameter pr. channel to compute the attention value for a single timestep.
-    """
-
-    def __init__(self, return_attention=False, **kwargs):
-        self.init = initializers.get('uniform')
-        self.supports_masking = True
-        self.return_attention = return_attention
-        super(AttentionWeightedAverage, self).__init__(** kwargs)
-
-    def build(self, input_shape):
-        self.input_spec = [InputSpec(ndim=3)]
-        assert len(input_shape) == 3
-
-        self.W = self.add_weight(shape=(input_shape[2], 1),
-                                 name='{}_W'.format(self.name),
-                                 initializer=self.init)
-        self.trainable_weights = [self.W]
-        super(AttentionWeightedAverage, self).build(input_shape)
-
-    def call(self, x, mask=None):
-        # computes a probability distribution over the timesteps
-        # uses 'max trick' for numerical stability
-        # reshape is done to avoid issue with Tensorflow
-        # and 1-dimensional weights
-        logits = K.dot(x, self.W)
-        x_shape = K.shape(x)
-        logits = K.reshape(logits, (x_shape[0], x_shape[1]))
-        ai = K.exp(logits - K.max(logits, axis=-1, keepdims=True))
-
-        # masked timesteps have zero weight
-        if mask is not None:
-            mask = K.cast(mask, K.floatx())
-            ai = ai * mask
-        att_weights = ai / (K.sum(ai, axis=1, keepdims=True) + K.epsilon())
-        weighted_input = x * K.expand_dims(att_weights)
-        result = K.sum(weighted_input, axis=1)
-        if self.return_attention:
-            return [result, att_weights]
-        return result
-
-    def get_output_shape_for(self, input_shape):
-        return self.compute_output_shape(input_shape)
-
-    def compute_output_shape(self, input_shape):
-        output_len = input_shape[2]
-        if self.return_attention:
-            return [(input_shape[0], output_len), (input_shape[0], input_shape[1])]
-        return (input_shape[0], output_len)
-
-    def compute_mask(self, input, input_mask=None):
-        if isinstance(input_mask, list):
-            return [None] * len(input_mask)
-        else:
-            return None
-
-
-# In[4]:
-
 
 spell_model = gensim.models.KeyedVectors.load_word2vec_format('wiki-news-300d-1M/wiki-news-300d-1M.vec')
 words = spell_model.index2word
@@ -127,12 +50,10 @@ for i,word in enumerate(words):
 WORDS = w_rank
 
 
-# In[5]:
-
-
 # Use fast text as vocabulary
 def words(text): 
     return re.findall(r'\w+', text.lower())
+
 
 def P(word): 
     "Probability of `word`."
@@ -140,17 +61,21 @@ def P(word):
     # returns 0 if the word isn't in the dictionary
     return - WORDS.get(word, 0)
 
+
 def correction(word): 
     "Most probable spelling correction for word."
     return max(candidates(word), key=P)
+
 
 def candidates(word): 
     "Generate possible spelling corrections for word."
     return (known([word]) or known(edits1(word)) or [word])
 
+
 def known(words): 
     "The subset of `words` that appear in the dictionary of WORDS."
     return set(w for w in words if w in WORDS)
+
 
 def edits1(word):
     "All edits that are one edit away from `word`."
@@ -162,15 +87,14 @@ def edits1(word):
     inserts    = [L + c + R               for L, R in splits for c in letters]
     return set(deletes + transposes + replaces + inserts)
 
+
 def edits2(word): 
     "All edits that are two edits away from `word`."
     return (e2 for e1 in edits1(word) for e2 in edits1(e1))
 
+
 def singlify(word):
     return "".join([letter for i,letter in enumerate(word) if i == 0 or letter != word[i-1]])
-
-
-# In[6]:
 
 
 def load_glove(word_dict, lemma_dict):
@@ -233,9 +157,6 @@ def load_glove(word_dict, lemma_dict):
     return embedding_matrix, nb_words 
 
 
-# In[7]:
-
-
 def load_fasttext(word_dict, lemma_dict):
     EMBEDDING_FILE = 'wiki-news-300d-1M/wiki-news-300d-1M.vec'
     def get_coefs(word,*arr): return word, np.asarray(arr, dtype='float32')
@@ -296,9 +217,6 @@ def load_fasttext(word_dict, lemma_dict):
     return embedding_matrix, nb_words 
 
 
-# In[8]:
-
-
 def load_para(word_dict, lemma_dict):
     EMBEDDING_FILE = 'paragram_300_sl999/paragram_300_sl999.txt'
     def get_coefs(word,*arr): return word, np.asarray(arr, dtype='float32')
@@ -356,10 +274,7 @@ def load_para(word_dict, lemma_dict):
                 embedding_matrix[word_dict[key]] = embedding_vector
                 continue
         embedding_matrix[word_dict[key]] = unknown_vector                    
-    return embedding_matrix, nb_words 
-
-
-# In[9]:
+    return embedding_matrix, nb_words
 
 
 def build_model(embedding_matrix, nb_words, embedding_size=300):
@@ -378,91 +293,26 @@ def build_model(embedding_matrix, nb_words, embedding_size=300):
     return model
 
 
-# In[10]:
-
-
 train = pd.read_csv('ids_and_questions_dataset.csv')
 
 
-# In[11]:
-
-
 train['Label'] = train['Label'].astype(str)
-
-
-# In[12]:
-
-
-#train['Label'].fillna("6", inplace = True)
-
-
-# In[13]:
-
-
 train = train.fillna(' ')
-
-
-# In[14]:
-
-
 train = train.iloc[:,1:]
-
-
-# In[15]:
-
-
-train.head()
-
-
-# In[16]:
-
-
-len(train)
-
-
-# In[17]:
-
 
 start_time = time.time()
 print("Loading data ...")
-#train = pd.read_csv('ids_and_questions_dataset.csv').fillna(' ')
-#test = pd.read_csv('test.csv').fillna(' ')
+# train = pd.read_csv('ids_and_questions_dataset.csv').fillna(' ')
+# test = pd.read_csv('test.csv').fillna(' ')
 train_text = train['Questions']
-#test_text = test['question_text']
+# test_text = test['question_text']
 text_list = train_text
 y1 = train['Label'].values
 num_train_data = y1.shape[0]
 
-#y = pd.get_dummies(train['Label']).values
-#print('Shape of label tensor:', y.shape)
-#print("--- %s seconds ---" % (time.time() - start_time))
-
-
-# In[18]:
-
-
-#print(y)
-
-
-# In[19]:
-
-
-#y.shape
-
-
-# In[20]:
-
-
-text_list.shape
-
-
-# In[21]:
-
-
-type(train['Label'][0])
-
-
-# In[ ]:
+# y = pd.get_dummies(train['Label']).values
+#  print('Shape of label tensor:', y.shape)
+# print("--- %s seconds ---" % (time.time() - start_time))
 
 y = to_categorical(y1, num_classes=6)
 
@@ -475,10 +325,6 @@ word_dict = {}
 word_index = 1
 lemma_dict = {}
 docs = nlp.pipe(text_list, n_threads = 2)
-
-
-# In[ ]:
-
 
 word_sequences = []
 
@@ -495,12 +341,8 @@ for doc in tqdm(docs):
 del docs
 gc.collect()
 train_word_sequences = word_sequences[:num_train_data]
-#test_word_sequences = word_sequences[num_train_data:]
+# test_word_sequences = word_sequences[num_train_data:]
 print("--- %s seconds ---" % (time.time() - start_time))
-
-
-# In[ ]:
-
 
 # hyperparameters
 max_length = 55
@@ -509,25 +351,11 @@ learning_rate = 0.001
 batch_size = 512
 num_epoch = 20
 
-
-# In[ ]:
-
-
 train_word_sequences = pad_sequences(train_word_sequences, maxlen=max_length, padding='post')
-#test_word_sequences = pad_sequences(test_word_sequences, maxlen=max_length, padding='post')
+# test_word_sequences = pad_sequences(test_word_sequences, maxlen=max_length, padding='post')
 print(train_word_sequences[:1])
-#print(test_word_sequences[:1])
-#pred_prob = np.zeros((len(test_word_sequences),), dtype=np.float32)
-
-
-# In[54]:
-
-
-train_word_sequences.shape
-
-
-# In[ ]:
-
+# print(test_word_sequences[:1])
+# pred_prob = np.zeros((len(test_word_sequences),), dtype=np.float32)
 
 start_time = time.time()
 print("Loading embedding matrix ...")
@@ -542,19 +370,15 @@ model = build_model(embedding_matrix, nb_words, embedding_size)
 model.fit(train_word_sequences, y, batch_size=batch_size, epochs=num_epoch-1, verbose=2)
 model.save("model_one.h5")
 print("Saved model to disk")
-#pred_prob += 0.15*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
+# pred_prob += 0.15*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 model.fit(train_word_sequences, y, batch_size=batch_size, epochs=1, verbose=2)
 model.save("model_two.h5")
 print("Saved model to disk")
-#pred_prob += 0.35*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
+# pred_prob += 0.35*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 del model, embedding_matrix_fasttext, embedding_matrix
 gc.collect()
 K.clear_session()
 print("--- %s seconds ---" % (time.time() - start_time))
-
-
-# In[ ]:
-
 
 start_time = time.time()
 print("Loading embedding matrix ...")
@@ -568,16 +392,12 @@ model = build_model(embedding_matrix, nb_words, embedding_size)
 model.fit(train_word_sequences, y, batch_size=batch_size, epochs=num_epoch-1, verbose=2)
 model.save("model_three.h5")
 print("Saved model to disk")
-#pred_prob += 0.15*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
+# pred_prob += 0.15*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 model.fit(train_word_sequences, y, batch_size=batch_size, epochs=1, verbose=2)
 model.save("model_four.h5")
 print("Saved model to disk")
-#pred_prob += 0.35*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
+# pred_prob += 0.35*np.squeeze(model.predict(test_word_sequences, batch_size=batch_size, verbose=2))
 print("--- %s seconds ---" % (time.time() - start_time))
-
-
-# In[ ]:
-
 
 '''submission = pd.DataFrame.from_dict({'qid': test['qid']})
 submission['prediction'] = (pred_prob>0.35).astype(int)
