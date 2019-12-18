@@ -15,5 +15,5 @@ Our approach was awarded the First Prize for this competition with an overall F1
 The link to the working notes for this paper can be found here:
 http://ceur-ws.org/Vol-2517/
 
-The link to the original paper is:
+The link to the paper is:
 http://ceur-ws.org/Vol-2517/T5-5.pdf
