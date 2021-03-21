@@ -10,7 +10,7 @@ This repository is a part of Classification of Insincere Questions(CIQ) track at
 5) Other
 6) Sincere Question
 
-The final code/model used is Full Model.py
+The final code/model used is ![link](https://github.com/diptamath/CIQ-Challenge/blob/master/Full%20Model.py)
 
 The model architecture is shown below:
 
